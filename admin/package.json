@@ -1,9 +1,9 @@
 {
-  "name": "adminfrontend",
+  "name": "sonachala-booking-engine-admin",
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "homepage": "https://jkglobalitsolutions.github.io/sonachala-Adminfrontend",
+  "homepage": "https://JKGlobalItSolutions.github.io/sonachala-booking-engine-admin",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
