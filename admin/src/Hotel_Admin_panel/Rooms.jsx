@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { collection, doc, getDocs, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, setDoc, deleteDoc, updateDoc, getDoc } from 'firebase/firestore';
 import { adminAuth as auth, adminDB as db } from '../firebase.admin';
 import { toast } from 'react-toastify';
 import { Modal, Button, Form } from 'react-bootstrap';
@@ -112,11 +112,17 @@ const RoomDetails = () => {
 
     setIsUploading(true);
     const homestayId = auth.currentUser.uid;
-    const roomRef = doc(db, 'Hotels', homestayId, 'Rooms', currentRoom.id || doc(collection(db, 'Hotels', homestayId, 'Rooms')).id);
+    let roomId = currentRoom.id;
+    if (!roomId) {
+      roomId = doc(collection(db, 'Hotels', homestayId, 'Rooms')).id;
+    }
+    const roomRef = doc(db, 'Hotels', homestayId, 'Rooms', String(roomId));
 
     try {
+      // 1. Save to Subcollection
       await setDoc(roomRef, {
         ...currentRoom,
+        id: String(roomId), // Ensure ID is saved in doc
         customName: currentRoom.customName || '',
         totalRooms: currentRoom.totalRooms.toString(),
         roomPrice: currentRoom.roomPrice.toString(),
@@ -130,6 +136,43 @@ const RoomDetails = () => {
           icon: facility.icon
         }))
       }, { merge: true });
+
+      // 2. Sync to Parent Document (User Site Source)
+      const parentDocRef = doc(db, 'Hotels', homestayId);
+      const parentSnap = await getDoc(parentDocRef);
+
+      if (parentSnap.exists()) {
+        const parentData = parentSnap.data();
+        let existingRoomTypes = parentData.roomTypes || [];
+
+        const roomForArray = {
+          id: String(roomId),
+          name: currentRoom.roomType,
+          count: Number(currentRoom.totalRooms),
+          bedType: currentRoom.bedType,
+          price: currentRoom.roomPrice,
+          // Preserving photos is tricky here as Rooms.jsx doesn't manage them fully yet.
+          // We rely on what's already there or empty if new.
+          photos: currentRoom.photos || [],
+          maxGuests: currentRoom.maxguestAllowed
+        };
+
+        const index = existingRoomTypes.findIndex(rt => String(rt.id) === String(roomId));
+
+        if (index !== -1) {
+          // Update: Preserve photos from existing array if we don't have new ones in state
+          if (!roomForArray.photos.length && existingRoomTypes[index].photos) {
+            roomForArray.photos = existingRoomTypes[index].photos;
+          }
+          existingRoomTypes[index] = { ...existingRoomTypes[index], ...roomForArray };
+        } else {
+          // Add New
+          existingRoomTypes.push(roomForArray);
+        }
+
+        await setDoc(parentDocRef, { roomTypes: existingRoomTypes }, { merge: true });
+        console.log("Synced to parent roomTypes array");
+      }
 
       await calculateAndStoreMaxGuests();
 

@@ -28,6 +28,8 @@ const AddProperty = () => {
         city: "",
         state: "",
         zipCode: "",
+        latitude: "",
+        longitude: "",
         description: "",
         amenities: {
             wifi: false, parking: false, ac: false, restaurant: false, pool: false, gym: false
@@ -96,6 +98,8 @@ const AddProperty = () => {
                             city: data.city || "",
                             state: data.state || "",
                             zipCode: data.zipCode || "",
+                            latitude: data.latitude || "",
+                            longitude: data.longitude || "",
                             description: data.description || data.About || "",
                             amenities: data.amenities || {
                                 wifi: false, parking: false, ac: false, restaurant: false, pool: false, gym: false
@@ -124,7 +128,22 @@ const AddProperty = () => {
                 // Initialize with one empty room type for new properties
                 setFormData(prev => ({
                     ...prev,
-                    roomTypes: [{ id: Date.now(), name: "Standard", count: 1, bedType: "Double", price: "", photos: [] }]
+                    roomTypes: [{
+                        id: Date.now(),
+                        name: "Standard",
+                        customName: "",
+                        count: 1,
+                        bedType: "Double",
+                        price: "",
+                        perAdultPrice: "",
+                        perChildPrice: "",
+                        discount: "",
+                        maxguestAllowed: 2,
+                        roomSize: "",
+                        availability: "Yes",
+                        facilities: [],
+                        photos: []
+                    }]
                 }));
             }
         };
@@ -176,7 +195,22 @@ const AddProperty = () => {
     const addRoomType = () => {
         setFormData(prev => ({
             ...prev,
-            roomTypes: [...prev.roomTypes, { id: Date.now(), name: "Standard", count: 1, bedType: "Double", price: "", photos: [] }]
+            roomTypes: [...prev.roomTypes, {
+                id: Date.now(),
+                name: "Standard",
+                customName: "",
+                count: 1,
+                bedType: "Double",
+                price: "",
+                perAdultPrice: "",
+                perChildPrice: "",
+                discount: "",
+                maxguestAllowed: 2,
+                roomSize: "",
+                availability: "Yes",
+                facilities: [],
+                photos: []
+            }]
         }));
     };
 
@@ -299,9 +333,17 @@ const AddProperty = () => {
                 return {
                     id: rt.id,
                     name: rt.name,
+                    customName: rt.customName || "",
                     count: Number(rt.count),
                     bedType: rt.bedType,
                     price: rt.price || "",
+                    perAdultPrice: rt.perAdultPrice || "",
+                    perChildPrice: rt.perChildPrice || "",
+                    discount: rt.discount || "",
+                    maxguestAllowed: rt.maxguestAllowed || 2,
+                    roomSize: rt.roomSize || "",
+                    availability: rt.availability || "Yes",
+                    facilities: rt.facilities || [],
                     photos: photoUrls
                 };
             }));
@@ -317,26 +359,36 @@ const AddProperty = () => {
             // This ensures RateManagement.jsx and CalendarAvailability.jsx can find the rooms
             const roomsCollectionRef = collection(db, collectionName, targetId, "Rooms");
 
-            // Note: We are using setDoc on specific IDs to keep them stable
-            await Promise.all(processedRoomTypes.map(async (rt) => {
-                await setDoc(doc(roomsCollectionRef, String(rt.id)), {
-                    ...rt,
-                    // Map to schema expected by Rooms.jsx
-                    roomType: rt.name,
-                    totalRooms: Number(rt.count),
-                    // Defaults for detailed fields to prevent missing data in sidebar
-                    roomPrice: rt.price || "0",
-                    perAdultPrice: "0",
-                    perChildPrice: "0",
-                    discount: "0",
-                    maxguestAllowed: "2",
-                    roomSize: "0",
-                    availability: "Yes",
-                    facilities: [],
+            // Sync Room Types to Subcollection
+            try {
+                const roomsCollectionRef = collection(db, collectionName, targetId, "Rooms");
+                console.log("Syncing rooms to:", collectionName, targetId);
 
-                    updatedAt: new Date()
-                }, { merge: true }); // Merge to preserve any subcollections like DailyRates or BlockedDates
-            }));
+                await Promise.all(processedRoomTypes.map(async (rt) => {
+                    const roomDocRef = doc(roomsCollectionRef, String(rt.id));
+                    await setDoc(roomDocRef, {
+                        ...rt,
+                        roomType: rt.name,
+                        customName: rt.customName,
+                        totalRooms: Number(rt.count),
+                        // Defaults for detailed fields to prevent missing data in sidebar
+                        roomPrice: rt.price || "0",
+                        perAdultPrice: rt.perAdultPrice || "0",
+                        perChildPrice: rt.perChildPrice || "0",
+                        discount: rt.discount || "0",
+                        maxguestAllowed: rt.maxguestAllowed || "2",
+                        roomSize: rt.roomSize || "0",
+                        availability: rt.availability || "Yes",
+                        facilities: rt.facilities || [],
+
+                        updatedAt: new Date()
+                    }, { merge: true });
+                }));
+                console.log("Rooms synced successfully");
+            } catch (syncErr) {
+                console.error("FAILED to sync rooms subcollection:", syncErr);
+                alert("Main property saved, BUT Room Details failed to sync. Please try saving again. Warning: " + syncErr.message);
+            }
 
             const docData = {
                 ...formData,
@@ -348,12 +400,19 @@ const AddProperty = () => {
                 bedArrangements: legacyBedString,
                 roomPhotos: allRoomPhotos,
 
+                // Location
+                latitude: Number(formData.latitude),
+                longitude: Number(formData.longitude),
+                map: `${formData.latitude},${formData.longitude}`, // Legacy format
+
                 ownerId: targetId,
                 status: "Pending",
                 updatedAt: new Date(),
 
                 propertyDocuments: docUrls,
                 exteriorPhotos: extUrls,
+                // Legacy Image Field for User Site
+                hotelImages: extUrls,
                 paymentQr: qrUrl
             };
 
@@ -366,6 +425,10 @@ const AddProperty = () => {
             } else {
                 docData.homestayName = formData.propertyName;
                 docData['Property Name'] = formData.propertyName;
+                // Homestays often used 'images' instead of hotelImages
+                docData.images = extUrls;
+                docData.address = formData.address;
+                docData.phone = formData.phone;
             }
 
             await setDoc(doc(db, collectionName, targetId), docData, { merge: true });
@@ -460,48 +523,76 @@ const AddProperty = () => {
                                     {formData.roomTypes.map((rt, index) => (
                                         <div key={rt.id} className="card border p-3 mb-3 bg-light">
                                             <div className="row g-3">
-                                                <div className="col-md-3">
-                                                    <label className="small fw-bold mb-1">Room Type</label>
-                                                    <select
-                                                        className="form-select border-0 shadow-sm"
-                                                        value={rt.name}
-                                                        onChange={(e) => updateRoomType(index, 'name', e.target.value)}
-                                                    >
+                                                {/* Top Row: Type, Custom Name, Count */}
+                                                <div className="col-md-4">
+                                                    <label className="small fw-bold mb-1">Room Type <span className="text-danger">*</span></label>
+                                                    <select className="form-select border-0 shadow-sm" value={rt.name} onChange={(e) => updateRoomType(index, 'name', e.target.value)}>
                                                         {ROOM_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                                                     </select>
                                                 </div>
+                                                <div className="col-md-4">
+                                                    <label className="small fw-bold mb-1">Custom Name (Optional)</label>
+                                                    <input type="text" className="form-control border-0 shadow-sm" value={rt.customName} placeholder="e.g. Hilltop View" onChange={(e) => updateRoomType(index, 'customName', e.target.value)} />
+                                                    <small className="text-muted" style={{ fontSize: '10px' }}>Displayed to guests</small>
+                                                </div>
                                                 <div className="col-md-2">
-                                                    <label className="small fw-bold mb-1">Count</label>
-                                                    <input
-                                                        type="number" className="form-control border-0 shadow-sm"
-                                                        value={rt.count} min="1"
-                                                        onChange={(e) => updateRoomType(index, 'count', e.target.value)}
-                                                    />
+                                                    <label className="small fw-bold mb-1">Total Rooms</label>
+                                                    <input type="number" className="form-control border-0 shadow-sm" value={rt.count} min="1" onChange={(e) => updateRoomType(index, 'count', e.target.value)} />
                                                 </div>
-                                                <div className="col-md-3">
-                                                    <label className="small fw-bold mb-1">Bed Type</label>
-                                                    <select
-                                                        className="form-select border-0 shadow-sm"
-                                                        value={rt.bedType}
-                                                        onChange={(e) => updateRoomType(index, 'bedType', e.target.value)}
-                                                    >
-                                                        {BED_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                                                    </select>
-                                                </div>
-                                                <div className="col-md-3">
-                                                    <label className="small fw-bold mb-1">Photos (Required)</label>
-                                                    <input type="file" multiple accept="image/*" className="form-control form-control-sm" onChange={(e) => handleRoomPhotoUpload(e, index)} />
-                                                </div>
-                                                <div className="col-md-1 d-flex align-items-end justify-content-center">
+                                                <div className="col-md-2 d-flex align-items-end justify-content-end">
                                                     <button type="button" onClick={() => removeRoomType(index)} className="btn btn-outline-danger btn-sm p-2 rounded-circle" disabled={formData.roomTypes.length === 1}>
                                                         <Trash2 size={16} />
                                                     </button>
                                                 </div>
 
-                                                {/* Price Field - Optional for now but good for UI */}
-                                                {/* <div className="col-md-3"><label className="small fw-bold">Base Price</label><input type="number" ... /></div> */}
+                                                {/* Price & Occupancy */}
+                                                <div className="col-md-3">
+                                                    <label className="small fw-bold mb-1">Room Price <span className="text-danger">*</span></label>
+                                                    <input type="number" className="form-control border-0 shadow-sm" value={rt.price} min="0" placeholder="0" onChange={(e) => updateRoomType(index, 'price', e.target.value)} />
+                                                </div>
+                                                <div className="col-md-3">
+                                                    <label className="small fw-bold mb-1">Bed Type</label>
+                                                    <select className="form-select border-0 shadow-sm" value={rt.bedType} onChange={(e) => updateRoomType(index, 'bedType', e.target.value)}>
+                                                        {BED_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                                    </select>
+                                                </div>
+                                                <div className="col-md-3">
+                                                    <label className="small fw-bold mb-1">Max Guests</label>
+                                                    <input type="number" className="form-control border-0 shadow-sm" value={rt.maxguestAllowed} min="1" onChange={(e) => updateRoomType(index, 'maxguestAllowed', e.target.value)} />
+                                                </div>
+                                                <div className="col-md-3">
+                                                    <label className="small fw-bold mb-1">Room Size (sq ft)</label>
+                                                    <input type="number" className="form-control border-0 shadow-sm" value={rt.roomSize} min="0" onChange={(e) => updateRoomType(index, 'roomSize', e.target.value)} />
+                                                </div>
 
-                                                {/* Preview Photos for this type */}
+                                                {/* Extra Prices */}
+                                                <div className="col-md-3">
+                                                    <label className="small fw-bold mb-1">Per Adult Price</label>
+                                                    <input type="number" className="form-control border-0 shadow-sm" value={rt.perAdultPrice} min="0" onChange={(e) => updateRoomType(index, 'perAdultPrice', e.target.value)} />
+                                                </div>
+                                                <div className="col-md-3">
+                                                    <label className="small fw-bold mb-1">Per Child Price</label>
+                                                    <input type="number" className="form-control border-0 shadow-sm" value={rt.perChildPrice} min="0" onChange={(e) => updateRoomType(index, 'perChildPrice', e.target.value)} />
+                                                </div>
+                                                <div className="col-md-3">
+                                                    <label className="small fw-bold mb-1">Discount (%)</label>
+                                                    <input type="number" className="form-control border-0 shadow-sm" value={rt.discount} min="0" max="100" onChange={(e) => updateRoomType(index, 'discount', e.target.value)} />
+                                                </div>
+                                                <div className="col-md-3">
+                                                    <label className="small fw-bold mb-1">Availability</label>
+                                                    <select className="form-select border-0 shadow-sm" value={rt.availability} onChange={(e) => updateRoomType(index, 'availability', e.target.value)}>
+                                                        <option value="Yes">Yes</option>
+                                                        <option value="No">No</option>
+                                                    </select>
+                                                </div>
+
+                                                {/* Photos */}
+                                                <div className="col-12">
+                                                    <label className="small fw-bold mb-1">Photos (Required)</label>
+                                                    <input type="file" multiple accept="image/*" className="form-control form-control-sm" onChange={(e) => handleRoomPhotoUpload(e, index)} />
+                                                </div>
+
+                                                {/* Preview Photos */}
                                                 {rt.photos.length > 0 && (
                                                     <div className="col-12 d-flex flex-wrap gap-2 mt-2">
                                                         {rt.photos.map((img, i) => (
@@ -541,6 +632,20 @@ const AddProperty = () => {
                                     <div className="col-md-4">
                                         <label className="form-label">Zip Code</label>
                                         <input type="text" className="form-control bg-light border-0" name="zipCode" value={formData.zipCode} onChange={handleChange} required />
+                                    </div>
+                                    <div className="col-md-6">
+                                        <label className="form-label">Latitude <span className="text-danger">*</span></label>
+                                        <input type="text" className="form-control bg-light border-0" name="latitude" value={formData.latitude} onChange={handleChange} placeholder="e.g. 12.9716" required />
+                                    </div>
+                                    <div className="col-md-6">
+                                        <label className="form-label">Longitude <span className="text-danger">*</span></label>
+                                        <input type="text" className="form-control bg-light border-0" name="longitude" value={formData.longitude} onChange={handleChange} placeholder="e.g. 77.5946" required />
+                                    </div>
+                                    <div className="col-12">
+                                        <small className="text-muted d-block mt-1">
+                                            <Info size={14} className="me-1" />
+                                            Tip: Right-click a place on Google Maps and select the coordinates to copy them here.
+                                        </small>
                                     </div>
                                 </div>
 

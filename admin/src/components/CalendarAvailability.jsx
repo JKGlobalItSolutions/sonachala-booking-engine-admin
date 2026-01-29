@@ -94,7 +94,7 @@ const CalendarAvailability = ({ propertyId, collectionName }) => {
 
             rooms.forEach(room => {
                 // If action is block, set isBlocked=true. If unblock, delete doc or set false.
-                const docRef = doc(db, collectionName || 'Hotels', propertyId, 'Rooms', room.id, 'BlockedDates', selectedDate);
+                const docRef = doc(db, collectionName || 'Hotels', propertyId, 'Rooms', String(room.id), 'BlockedDates', selectedDate);
 
                 if (modalAction === 'block') {
                     batch.set(docRef, { date: selectedDate, isBlocked: true, updatedAt: Timestamp.now() }, { merge: true });

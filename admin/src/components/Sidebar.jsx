@@ -206,7 +206,6 @@ const Sidebar = ({ isOpen, toggle }) => {
   const menuItems = adminType === 'hotel' ? [
     { to: "/hotel-RoomStatus", text: "Dashboard", icon: RoomstatusIcon },
     listingsItem,
-    { to: "/hotel-Rooms", text: "Rooms", icon: roomsicon },
     { to: "/hotel-GuestDetails", text: "Guests", icon: usericon },
     { to: "/hotel-Page", text: "Property Details", icon: locationicon },
     { to: "/hotel-Payments", text: "Payments", icon: rupees },
@@ -215,7 +214,6 @@ const Sidebar = ({ isOpen, toggle }) => {
   ] : adminType === 'homestay' ? [
     { to: "/homestay-RoomStatus", text: "Dashboard", icon: RoomstatusIcon },
     listingsItem,
-    { to: "/homestay-Rooms", text: "Rooms", icon: roomsicon },
     { to: "/homestay-GuestDetails", text: "Guests", icon: usericon },
     { to: "/homestay-Page", text: "Property Details", icon: locationicon },
     { to: "/homestay-Payment", text: "Payments", icon: rupees },

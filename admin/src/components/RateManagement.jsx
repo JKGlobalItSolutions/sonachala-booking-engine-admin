@@ -56,7 +56,7 @@ const RateManagement = ({ propertyId, collectionName }) => {
                 const dateISO = d.toISOString().split('T')[0];
 
                 selectedRooms.forEach(roomId => {
-                    const rateRef = doc(db, collectionName || 'Hotels', propertyId, 'Rooms', roomId, 'DailyRates', dateISO);
+                    const rateRef = doc(db, collectionName || 'Hotels', propertyId, 'Rooms', String(roomId), 'DailyRates', dateISO);
                     batch.set(rateRef, {
                         date: dateISO,
                         price: parseFloat(newPrice),

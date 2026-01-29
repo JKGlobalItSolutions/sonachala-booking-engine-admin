@@ -3,13 +3,16 @@
 
 
 import React, { useEffect, useState } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
 import { auth, db } from "../firebase/config";
+import { useAuth } from "../auth/AuthContext";
 import { Modal, Button, Badge, Form, InputGroup } from "react-bootstrap";
 import { Search, Filter, Eye, X } from "lucide-react";
+import { toast } from "react-toastify";
 import guestsImage from '../assets/Guests.jpg';
 
 const GuestDetails = () => {
+  const { user } = useAuth();
   const [guests, setGuests] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -18,45 +21,57 @@ const GuestDetails = () => {
   const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
-    const fetchGuests = async () => {
-      try {
-        const user = auth.currentUser;
-        if (!user) return;
+    if (!user?.uid) {
+      if (!auth.currentUser) return;
+    }
 
-        const guestRef = collection(db, "Hotels", user.uid, "Guest Details");
-        const guestSnap = await getDocs(guestRef);
+    const uid = user?.uid || auth.currentUser?.uid;
+    if (!uid) return;
 
-        const hotelGuests = [];
-        guestSnap.forEach((docSnap) => {
-          const data = docSnap.data();
-          const paymentProof = Array.isArray(data["Payment Proof"]) ? data["Payment Proof"] : [];
-          const proofUrls = paymentProof.map((item) => item.url).filter(Boolean);
+    const guestRef = collection(db, "Hotels", uid, "Guest Details");
+    // Removed specific orderBy if "Booking Date" might be missing on legacy docs, 
+    // or we can sort client-side to be safe.
 
-          if (data.latestProofUrl && !proofUrls.includes(data.latestProofUrl)) {
-            proofUrls.push(data.latestProofUrl);
-          }
+    const unsubscribe = onSnapshot(guestRef, (snapshot) => {
+      const hotelGuests = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const paymentProof = Array.isArray(data["Payment Proof"]) ? data["Payment Proof"] : [];
+        const proofUrls = paymentProof.map((item) => item.url).filter(Boolean);
 
-          hotelGuests.push({
-            id: docSnap.id,
-            ...data,
-            allProofUrls: proofUrls,
-            checkInRaw: data["Check-In Date"]?.toDate ? data["Check-In Date"].toDate() : new Date(data["Check-In Date"]),
-            checkOutRaw: data["Check-Out Date"]?.toDate ? data["Check-Out Date"].toDate() : new Date(data["Check-Out Date"]),
-          });
+        if (data.latestProofUrl && !proofUrls.includes(data.latestProofUrl)) {
+          proofUrls.push(data.latestProofUrl);
+        }
+
+        hotelGuests.push({
+          id: docSnap.id,
+          ...data,
+          fullName: data["Guest Name"] || data["Full Name"] || "N/A",
+          phoneNumber: data["Mobile Number"] || data["Phone Number"] || "N/A",
+          allProofUrls: proofUrls,
+          checkInRaw: data["Check-In Date"]?.toDate ? data["Check-In Date"].toDate() : new Date(data["Check-In Date"] || Date.now()),
+          checkOutRaw: data["Check-Out Date"]?.toDate ? data["Check-Out Date"].toDate() : new Date(data["Check-Out Date"] || Date.now()),
         });
+      });
 
-        // Sort by check-in date (newest first)
-        hotelGuests.sort((a, b) => b.checkInRaw - a.checkInRaw);
-        setGuests(hotelGuests);
-      } catch (err) {
-        console.error("Error fetching guests:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
+      // Sort by check-in date (newest first)
+      hotelGuests.sort((a, b) => b.checkInRaw - a.checkInRaw);
 
-    fetchGuests();
-  }, []);
+      setGuests(prev => {
+        if (prev.length > 0 && hotelGuests.length > prev.length) {
+          const newCount = hotelGuests.length - prev.length;
+          toast.info(`New booking received! (${newCount} new)`);
+        }
+        return hotelGuests;
+      });
+      setLoading(false);
+    }, (err) => {
+      console.error("Error listening to guest details:", err);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
 
   const getStatusBadge = (status) => {
     switch (status?.toLowerCase()) {
@@ -80,7 +95,7 @@ const GuestDetails = () => {
   };
 
   const filteredGuests = guests.filter((guest) => {
-    const matchesSearch = guest["Full Name"]?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = guest.fullName?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "All" ||
       (statusFilter === "Active" && new Date(guest.checkOutRaw) > new Date() && guest["Status"] !== "Cancelled") ||
       (statusFilter === "Completed" && new Date(guest.checkOutRaw) <= new Date()) ||
@@ -167,8 +182,8 @@ const GuestDetails = () => {
                   filteredGuests.map((guest) => (
                     <tr key={guest.id}>
                       <td className="ps-4">
-                        <div className="fw-bold text-dark">{guest["Full Name"]}</div>
-                        <div className="small text-muted">{guest["Phone Number"]}</div>
+                        <div className="fw-bold text-dark">{guest.fullName}</div>
+                        <div className="small text-muted">{guest.phoneNumber}</div>
                       </td>
                       <td>{guest.checkInRaw.toLocaleDateString()}</td>
                       <td>{guest.checkOutRaw.toLocaleDateString()}</td>
@@ -203,7 +218,7 @@ const GuestDetails = () => {
             <div className="row g-4">
               <div className="col-12 d-flex justify-content-between align-items-center mb-2">
                 <div>
-                  <h4 className="mb-0 fw-bold">{selectedGuest["Full Name"]}</h4>
+                  <h4 className="mb-0 fw-bold">{selectedGuest.fullName}</h4>
                   <span className="text-muted">{selectedGuest.confirmationId || selectedGuest.id}</span>
                 </div>
                 <div className="text-end">
@@ -220,7 +235,7 @@ const GuestDetails = () => {
                   </div>
                   <div className="d-flex justify-content-between mb-2">
                     <span className="text-muted">Phone</span>
-                    <span className="fw-medium">{selectedGuest["Phone Number"] || "N/A"}</span>
+                    <span className="fw-medium">{selectedGuest.phoneNumber || "N/A"}</span>
                   </div>
                 </div>
               </div>
