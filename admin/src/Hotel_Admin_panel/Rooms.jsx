@@ -43,14 +43,24 @@ const RoomDetails = () => {
   const fetchRooms = useCallback(async () => {
     setIsLoading(true);
     if (auth.currentUser) {
-      const homestayId = auth.currentUser.uid;
-      const roomsCollection = collection(db, 'Hotels', homestayId, 'Rooms');
-      const roomsSnapshot = await getDocs(roomsCollection);
-      const roomsList = roomsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setRooms(roomsList);
+      const uid = auth.currentUser.uid;
+      let allRooms = [];
+      try {
+        // Fetch from Hotels
+        const hotelsRef = collection(db, 'Hotels', uid, 'Rooms');
+        const hotelsSnap = await getDocs(hotelsRef);
+        hotelsSnap.forEach(doc => allRooms.push({ id: doc.id, ...doc.data(), type: 'Hotel' }));
+
+        // Fetch from Homestays
+        const homestaysRef = collection(db, 'Homestays', uid, 'Rooms');
+        const homestaysSnap = await getDocs(homestaysRef);
+        homestaysSnap.forEach(doc => allRooms.push({ id: doc.id, ...doc.data(), type: 'Homestay' }));
+
+        setRooms(allRooms);
+      } catch (error) {
+        console.error("Error fetching rooms:", error);
+        toast.error("Error loading rooms");
+      }
     }
     setIsLoading(false);
   }, []);
@@ -200,7 +210,7 @@ const RoomDetails = () => {
 
   return (
     <div className="room-details-container p-lg-3">
-      <style jsx>{`
+      <style>{`
         .room-details-container {
           width: 100%;
         }

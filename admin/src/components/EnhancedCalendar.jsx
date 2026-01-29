@@ -2,107 +2,107 @@ import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Calendar, Users, Bed, Clock, Filter } from 'lucide-react';
 
 const EnhancedCalendar = ({
-    events = {},
-    rooms = [],
-    onDateSelect,
-    selectedDate,
-    className = ''
+  events = {},
+  rooms = [],
+  onDateSelect,
+  selectedDate,
+  className = ''
 }) => {
-    const [currentMonth, setCurrentMonth] = useState(new Date());
-    const [viewMode, setViewMode] = useState('month'); // 'month', 'week', 'day'
-    const [showFilters, setShowFilters] = useState(false);
-    const [filters, setFilters] = useState({
-        showAvailable: true,
-        showOccupied: true,
-        showUpcoming: true,
-        showEvents: true
-    });
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [viewMode, setViewMode] = useState('month'); // 'month', 'week', 'day'
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    showAvailable: true,
+    showOccupied: true,
+    showUpcoming: true,
+    showEvents: true
+  });
 
-    const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
-    const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
-    const monthNames = ["January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
-    ];
-    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
+  const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
+  const monthNames = ["January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-    const isToday = (date) => {
-        const today = new Date();
-        return date.getDate() === today.getDate() &&
-            date.getMonth() === today.getMonth() &&
-            date.getFullYear() === today.getFullYear();
+  const isToday = (date) => {
+    const today = new Date();
+    return date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear();
+  };
+
+  const isSelected = (date) => {
+    return date.getDate() === selectedDate.getDate() &&
+      date.getMonth() === selectedDate.getMonth() &&
+      date.getFullYear() === selectedDate.getFullYear();
+  };
+
+  const getDateStatus = (date) => {
+    const dateString = date.toISOString().split('T')[0];
+    if (events[dateString]) {
+      const totalRooms = rooms.reduce((sum, room) => sum + parseInt(room.totalRooms || 0), 0);
+      const bookedRooms = events[dateString].reduce((sum, event) => sum + event.count, 0);
+      if (bookedRooms >= totalRooms) {
+        return 'fully-booked';
+      } else {
+        return 'partially-booked';
+      }
+    }
+    return '';
+  };
+
+  const getEventsForDate = (date) => {
+    const dateString = date.toISOString().split('T')[0];
+    return events[dateString] || [];
+  };
+
+  const getRoomStatsForDate = (date) => {
+    const dateString = date.toISOString().split('T')[0];
+    const totalRooms = rooms.reduce((sum, room) => sum + parseInt(room.totalRooms || 0), 0);
+    const occupiedRooms = events[dateString]?.reduce((sum, event) => sum + event.count, 0) || 0;
+    const availableRooms = totalRooms - occupiedRooms;
+
+    return {
+      total: totalRooms,
+      occupied: occupiedRooms,
+      available: availableRooms,
+      occupancyRate: totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100) : 0
     };
+  };
 
-    const isSelected = (date) => {
-        return date.getDate() === selectedDate.getDate() &&
-            date.getMonth() === selectedDate.getMonth() &&
-            date.getFullYear() === selectedDate.getFullYear();
-    };
+  const prevMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+  };
 
-    const getDateStatus = (date) => {
-        const dateString = date.toISOString().split('T')[0];
-        if (events[dateString]) {
-            const totalRooms = rooms.reduce((sum, room) => sum + parseInt(room.totalRooms || 0), 0);
-            const bookedRooms = events[dateString].reduce((sum, event) => sum + event.count, 0);
-            if (bookedRooms >= totalRooms) {
-                return 'fully-booked';
-            } else {
-                return 'partially-booked';
-            }
-        }
-        return '';
-    };
+  const nextMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+  };
 
-    const getEventsForDate = (date) => {
-        const dateString = date.toISOString().split('T')[0];
-        return events[dateString] || [];
-    };
+  const handleDateClick = (date) => {
+    if (onDateSelect) {
+      onDateSelect(date);
+    }
+  };
 
-    const getRoomStatsForDate = (date) => {
-        const dateString = date.toISOString().split('T')[0];
-        const totalRooms = rooms.reduce((sum, room) => sum + parseInt(room.totalRooms || 0), 0);
-        const occupiedRooms = events[dateString]?.reduce((sum, event) => sum + event.count, 0) || 0;
-        const availableRooms = totalRooms - occupiedRooms;
+  const toggleFilter = (filterKey) => {
+    setFilters(prev => ({
+      ...prev,
+      [filterKey]: !prev[filterKey]
+    }));
+  };
 
-        return {
-            total: totalRooms,
-            occupied: occupiedRooms,
-            available: availableRooms,
-            occupancyRate: totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100) : 0
-        };
-    };
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
 
-    const prevMonth = () => {
-        setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
-    };
-
-    const nextMonth = () => {
-        setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
-    };
-
-    const handleDateClick = (date) => {
-        if (onDateSelect) {
-            onDateSelect(date);
-        }
-    };
-
-    const toggleFilter = (filterKey) => {
-        setFilters(prev => ({
-            ...prev,
-            [filterKey]: !prev[filterKey]
-        }));
-    };
-
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-IN', {
-            style: 'currency',
-            currency: 'INR',
-            maximumFractionDigits: 0
-        }).format(amount);
-    };
-
-    return (
-        <div className={`enhanced-calendar ${className}`}>
-            <style jsx>{`
+  return (
+    <div className={`enhanced-calendar ${className}`}>
+      <style>{`
         .enhanced-calendar {
           background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
           border-radius: 16px;
@@ -503,126 +503,126 @@ const EnhancedCalendar = ({
         }
       `}</style>
 
-            <div className="calendar-header">
-                <div className="calendar-title">
-                    <Calendar size={24} />
-                    Calendar View
-                </div>
-                <div className="calendar-nav">
-                    <button onClick={prevMonth} className="nav-button" aria-label="Previous month">
-                        <ChevronLeft size={20} />
-                    </button>
-                    <div className="month-display">
-                        {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
-                    </div>
-                    <button onClick={nextMonth} className="nav-button" aria-label="Next month">
-                        <ChevronRight size={20} />
-                    </button>
-                </div>
-                <div className="view-controls">
-                    <button
-                        className={`view-button ${viewMode === 'month' ? 'active' : ''}`}
-                        onClick={() => setViewMode('month')}
-                    >
-                        Month
-                    </button>
-                    <button
-                        className={`view-button ${viewMode === 'week' ? 'active' : ''}`}
-                        onClick={() => setViewMode('week')}
-                    >
-                        Week
-                    </button>
-                    <button
-                        className={`view-button ${viewMode === 'day' ? 'active' : ''}`}
-                        onClick={() => setViewMode('day')}
-                    >
-                        Day
-                    </button>
-                </div>
-            </div>
-
-            <div className="filter-container">
-                <button
-                    className="filter-button"
-                    onClick={() => setShowFilters(!showFilters)}
-                >
-                    <Filter size={18} />
-                    Filters
-                </button>
-                {showFilters && (
-                    <div className="filter-dropdown">
-                        <div className="filter-option" onClick={() => toggleFilter('showAvailable')}>
-                            <div className={`filter-checkbox ${filters.showAvailable ? 'checked' : ''}`}></div>
-                            Show Available
-                        </div>
-                        <div className="filter-option" onClick={() => toggleFilter('showOccupied')}>
-                            <div className={`filter-checkbox ${filters.showOccupied ? 'checked' : ''}`}></div>
-                            Show Occupied
-                        </div>
-                        <div className="filter-option" onClick={() => toggleFilter('showUpcoming')}>
-                            <div className={`filter-checkbox ${filters.showUpcoming ? 'checked' : ''}`}></div>
-                            Show Upcoming
-                        </div>
-                        <div className="filter-option" onClick={() => toggleFilter('showEvents')}>
-                            <div className={`filter-checkbox ${filters.showEvents ? 'checked' : ''}`}></div>
-                            Show Events
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            <div className="calendar-grid">
-                {dayNames.map(day => (
-                    <div key={day} className="calendar-header-day">{day}</div>
-                ))}
-                {Array.from({ length: firstDayOfMonth }).map((_, index) => (
-                    <div key={`empty-${index}`} className="calendar-day"></div>
-                ))}
-                {Array.from({ length: daysInMonth }).map((_, index) => {
-                    const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), index + 1);
-                    const status = getDateStatus(date);
-                    const stats = getRoomStatsForDate(date);
-                    const eventsForDate = getEventsForDate(date);
-
-                    return (
-                        <div
-                            key={index}
-                            className={`calendar-day ${isSelected(date) ? 'selected' : ''} ${isToday(date) ? 'today' : ''} ${status}`}
-                            onClick={() => handleDateClick(date)}
-                        >
-                            <div className="day-number">{index + 1}</div>
-                            {eventsForDate.length > 0 && (
-                                <div className="events-badge">{eventsForDate.length}</div>
-                            )}
-                            <div className="day-stats">
-                                <div className="stat-value">{stats.occupancyRate}%</div>
-                                <div className="stat-label">Occupied</div>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-
-            <div className="legend">
-                <div className="legend-item">
-                    <div className="legend-dot today"></div>
-                    Today
-                </div>
-                <div className="legend-item">
-                    <div className="legend-dot available"></div>
-                    Available
-                </div>
-                <div className="legend-item">
-                    <div className="legend-dot partially"></div>
-                    Partially Booked
-                </div>
-                <div className="legend-item">
-                    <div className="legend-dot fully"></div>
-                    Fully Booked
-                </div>
-            </div>
+      <div className="calendar-header">
+        <div className="calendar-title">
+          <Calendar size={24} />
+          Calendar View
         </div>
-    );
+        <div className="calendar-nav">
+          <button onClick={prevMonth} className="nav-button" aria-label="Previous month">
+            <ChevronLeft size={20} />
+          </button>
+          <div className="month-display">
+            {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+          </div>
+          <button onClick={nextMonth} className="nav-button" aria-label="Next month">
+            <ChevronRight size={20} />
+          </button>
+        </div>
+        <div className="view-controls">
+          <button
+            className={`view-button ${viewMode === 'month' ? 'active' : ''}`}
+            onClick={() => setViewMode('month')}
+          >
+            Month
+          </button>
+          <button
+            className={`view-button ${viewMode === 'week' ? 'active' : ''}`}
+            onClick={() => setViewMode('week')}
+          >
+            Week
+          </button>
+          <button
+            className={`view-button ${viewMode === 'day' ? 'active' : ''}`}
+            onClick={() => setViewMode('day')}
+          >
+            Day
+          </button>
+        </div>
+      </div>
+
+      <div className="filter-container">
+        <button
+          className="filter-button"
+          onClick={() => setShowFilters(!showFilters)}
+        >
+          <Filter size={18} />
+          Filters
+        </button>
+        {showFilters && (
+          <div className="filter-dropdown">
+            <div className="filter-option" onClick={() => toggleFilter('showAvailable')}>
+              <div className={`filter-checkbox ${filters.showAvailable ? 'checked' : ''}`}></div>
+              Show Available
+            </div>
+            <div className="filter-option" onClick={() => toggleFilter('showOccupied')}>
+              <div className={`filter-checkbox ${filters.showOccupied ? 'checked' : ''}`}></div>
+              Show Occupied
+            </div>
+            <div className="filter-option" onClick={() => toggleFilter('showUpcoming')}>
+              <div className={`filter-checkbox ${filters.showUpcoming ? 'checked' : ''}`}></div>
+              Show Upcoming
+            </div>
+            <div className="filter-option" onClick={() => toggleFilter('showEvents')}>
+              <div className={`filter-checkbox ${filters.showEvents ? 'checked' : ''}`}></div>
+              Show Events
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="calendar-grid">
+        {dayNames.map(day => (
+          <div key={day} className="calendar-header-day">{day}</div>
+        ))}
+        {Array.from({ length: firstDayOfMonth }).map((_, index) => (
+          <div key={`empty-${index}`} className="calendar-day"></div>
+        ))}
+        {Array.from({ length: daysInMonth }).map((_, index) => {
+          const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), index + 1);
+          const status = getDateStatus(date);
+          const stats = getRoomStatsForDate(date);
+          const eventsForDate = getEventsForDate(date);
+
+          return (
+            <div
+              key={index}
+              className={`calendar-day ${isSelected(date) ? 'selected' : ''} ${isToday(date) ? 'today' : ''} ${status}`}
+              onClick={() => handleDateClick(date)}
+            >
+              <div className="day-number">{index + 1}</div>
+              {eventsForDate.length > 0 && (
+                <div className="events-badge">{eventsForDate.length}</div>
+              )}
+              <div className="day-stats">
+                <div className="stat-value">{stats.occupancyRate}%</div>
+                <div className="stat-label">Occupied</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="legend">
+        <div className="legend-item">
+          <div className="legend-dot today"></div>
+          Today
+        </div>
+        <div className="legend-item">
+          <div className="legend-dot available"></div>
+          Available
+        </div>
+        <div className="legend-item">
+          <div className="legend-dot partially"></div>
+          Partially Booked
+        </div>
+        <div className="legend-item">
+          <div className="legend-dot fully"></div>
+          Fully Booked
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default EnhancedCalendar;

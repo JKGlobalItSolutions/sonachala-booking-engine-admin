@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ThumbsUp, ThumbsDown, Filter, ChevronLeft, ChevronRight, Users, Bed, Calendar, Clock } from 'lucide-react';
-import { collection, query, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, getDocs, Timestamp, doc, getDoc } from 'firebase/firestore';
 import { adminAuth, adminDB } from '../firebase.admin';
 import dashboardVideo from '../assets/Dashboard.mp4';
 import EnhancedCalendar from '../components/EnhancedCalendar';
@@ -12,6 +12,7 @@ const RoomStatus = () => {
   const [showFilter, setShowFilter] = useState(false);
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState({});
+  const [profileScore, setProfileScore] = useState(0);
 
   const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
   const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
@@ -22,7 +23,33 @@ const RoomStatus = () => {
 
   useEffect(() => {
     fetchRoomData();
+    calculateProfileScore();
   }, []);
+
+  const calculateProfileScore = async () => {
+    const user = adminAuth.currentUser;
+    if (!user) return;
+    try {
+      let snap = await getDoc(doc(adminDB, 'Hotels', user.uid));
+      if (!snap.exists()) {
+        snap = await getDoc(doc(adminDB, 'Homestays', user.uid));
+      }
+
+      if (snap.exists()) {
+        const data = snap.data();
+        let score = 0;
+        let total = 6;
+        if (data.hotelName || data.homestayName) score++;
+        if (data.hotelAddress || data.address) score++;
+        if (data.hotelContact || data.phone) score++;
+        if (data.about || data.description) score++;
+        if ((data.hotelImages && data.hotelImages.length > 0) || (data.exteriorPhotos && data.exteriorPhotos.length > 0)) score++;
+        if (String(data.totalRooms) > "0" || data.roomTypes?.length > 0) score++;
+
+        setProfileScore(Math.round((score / total) * 100));
+      }
+    } catch (e) { console.error("Score Error:", e); }
+  };
 
   const fetchRoomData = async () => {
     try {
@@ -138,8 +165,19 @@ const RoomStatus = () => {
   return (
     <div className="container-fluid">
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h2 className="text-primary fw-bold">Dashboard</h2>
-        <div className="text-secondary">{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
+        <div>
+          <h2 className="text-primary fw-bold">Dashboard</h2>
+          <div className="text-secondary">{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
+        </div>
+        <div className="d-flex align-items-center gap-3 bg-white p-2 px-3 rounded shadow-sm">
+          <div className="d-flex flex-column align-items-end">
+            <span className="fw-bold text-dark small">Profile Health</span>
+            <span className={`fw-bold h5 mb-0 ${profileScore === 100 ? 'text-success' : 'text-primary'}`}>{profileScore}%</span>
+          </div>
+          <div style={{ width: 45, height: 45, borderRadius: '50%', background: `conic-gradient(${profileScore === 100 ? '#198754' : '#0d6efd'} ${profileScore}%, #e9ecef 0)` }} className="d-flex align-items-center justify-content-center p-1">
+            <div className="bg-white rounded-circle w-100 h-100"></div>
+          </div>
+        </div>
       </div>
 
 

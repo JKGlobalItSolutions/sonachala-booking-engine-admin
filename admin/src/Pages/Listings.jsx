@@ -93,7 +93,7 @@ const Listings = () => {
                             <div className="card h-100 border-0 shadow-sm hover-shadow transition-all">
                                 <div className="position-relative" style={{ height: "200px" }}>
                                     <img
-                                        src={listing.images?.[0] || listing.propertyImage || "https://placehold.co/600x400?text=Property"}
+                                        src={listing.exteriorPhotos?.[0] || listing.images?.[0] || listing.propertyImage || "https://placehold.co/600x400?text=Property"}
                                         alt={listing.hotelName || listing.homestayName}
                                         className="w-100 h-100 object-fit-cover rounded-top"
                                         style={{ borderTopLeftRadius: '12px', borderTopRightRadius: '12px' }}
@@ -112,9 +112,18 @@ const Listings = () => {
                                         <span className={`badge ${listing.status === 'Approved' ? 'bg-success' : 'bg-warning text-dark'}`}>
                                             {listing.status || "Pending"}
                                         </span>
-                                        <Link to={listing.type === 'Hotel' ? '/hotel-RoomStatus' : '/homestay-RoomStatus'} className="btn btn-outline-primary btn-sm">
-                                            Manage Dashboard
-                                        </Link>
+                                        <div className="d-flex gap-2">
+                                            <Link
+                                                to="/admin/add-property"
+                                                state={{ isEdit: true, propertyId: listing.id }}
+                                                className="btn btn-light btn-sm"
+                                            >
+                                                Edit
+                                            </Link>
+                                            <Link to={listing.type === 'Hotel' ? '/hotel-RoomStatus' : '/homestay-RoomStatus'} className="btn btn-outline-primary btn-sm">
+                                                Manage
+                                            </Link>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
