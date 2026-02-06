@@ -1,5 +1,12 @@
 {
   "projects": {
-    "default": "sonachala-live"
+    "default": "sonachala-booking-engine-admin"
+  },
+  "targets": {
+    "your-project-id": {
+      "hosting": {
+        "admin": ["admin-site"]
+      }
+    }
   }
 }
