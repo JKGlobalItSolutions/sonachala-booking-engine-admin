@@ -5,8 +5,18 @@
   "targets": {
     "your-project-id": {
       "hosting": {
-        "admin": ["admin-site"]
+        "admin": [
+          "admin-site"
+        ]
+      }
+    },
+    "sonachala-admin-app": {
+      "hosting": {
+        "admin": [
+          "sonachala-admin-app"
+        ]
       }
     }
-  }
+  },
+  "etags": {}
 }
